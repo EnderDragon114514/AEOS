@@ -37,7 +37,9 @@ It has a graphical interface,XMS support,Rubidium Assembly support FAT32 filesys
 |Sound|Buzzer|×|Buzzer|
 
 1:Requires a fully installation of DOS7.1 or higher version
+
 2:Requires a fully installation of DOS6.22 or external CCDOS installation
+
 3:Mostly not available
 
 # How to compile
