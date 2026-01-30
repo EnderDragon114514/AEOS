@@ -20,6 +20,7 @@ It has a graphical interface,XMS support,Rubidium Assembly support FAT32 filesys
 |  Mouse   |   PS/2   |   PS/2    |
 |  Boot    |   BIOS   |    BIOS   |
 |  Disk    |  1.44MiB |    4MiB   |
+|----------|----------|-----------|
 
 # Comparison between DOS and AEOS
 |      |MS-DOS|VMDOS|AEOS|
@@ -35,6 +36,7 @@ It has a graphical interface,XMS support,Rubidium Assembly support FAT32 filesys
 |Long Filename|✔₁|×|×|
 |Internet|×₃|×|×|
 |Sound|Buzzer|×|Buzzer|
+|-----|------|--|------|
 1:Requires a fully installation of DOS7.1 or higher version
 2:Requires a fully installation of DOS6.22 or external CCDOS installation
 3:Mostly not available
