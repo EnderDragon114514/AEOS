@@ -1,0 +1,6 @@
+TYPEDEF g
+graph drawline 100 150 -13133060
+graph setcolor -13133060
+sset 128 Hello World!
+graph drawtext 0 0 4 128
+end

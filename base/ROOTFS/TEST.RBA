@@ -1,0 +1,5 @@
+sset 128 RbASM Shell
+sput 128
+sset 128 Type something...
+sget 129
+exec 129
