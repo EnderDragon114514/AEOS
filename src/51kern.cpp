@@ -1,3 +1,19 @@
+/*
+AEOS v5.11.2 Kernel and TTy
+This version is still a beta version(not stable),which means there will be some bugs,and it will be fixed in future updates
+Note:STOP ASKING ME TO MAKE THE LIBRARY EXTENSION FOR RBVM!I WILL IMPLENT IT!
+Bug report:send an email to lithium-offical@outlook.com or commit in github
+*/
+
+/*
+Future update implentions:
+1. Dynamic library extensions
+2. Graphics supports
+3. Pagefile(similar to Linux swapfile or swap parition and Windows pagefile)
+4. Hibernate(Requires pagefile)
+5. More background process
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,7 +24,10 @@ int getkey();
 int memi[5][128];
 float memf[5][128];
 char memc[5][128];
+int sectline[5][32];//short interger to reduce memory usage
+int sectstate[5][32];//the same as the upper one
 char mems[5][128][64];
+char sect[5][4][16][32];
 FILE *fin[5];
 char buf[256];
 char fileloc[5][64];
@@ -76,16 +95,111 @@ void read_string(FILE *f, char *buffer) {
 		buffer[0] = '\0';
 		return;
 	}
-	while (ch != EOF && ch != '\n' && ch != '\r' && i < 127) {
+	while (ch != EOF && ch != '\n' && ch != '\r' && i < 64) {
 		buffer[i++] = (char)ch;
 		ch = fgetc(f);
 	}
 	buffer[i] = '\0';
 }
+void read_string_32(FILE *f, char *buffer) {
+	int i = 0;
+	int ch;
+	while ((ch = fgetc(f)) != EOF && (ch == ' ' || ch == '\t'));
+	if (ch == EOF) {
+		buffer[0] = '\0';
+		return;
+	}
+	while (ch != EOF && ch != '\n' && ch != '\r' && i < 32) {
+		buffer[i++] = (char)ch;
+		ch = fgetc(f);
+	}
+	buffer[i] = '\0';
+}
+int encode_procid(int pid, int section) {
+	return 4 + (pid * 4) + section;
+}
+void decode_procid(int procid, int *pid, int *section) {
+	if (procid <= 4) {
+		*pid = procid;
+		*section = -1;
+	} else {
+		int temp = procid - 4;
+		*pid = (temp - 1) / 4;
+		*section = temp % 4;
+	}
+}
 int run(int procid,const char *_cmd) {
 	char buffer[128];
 	int a, b, c, d;
-	if (strcmp(_cmd, "nop") == 0) {
+	if(procid>4&&procid<=20)
+	{
+		int procid_tr=0;
+		int section_id=0;
+        decode_procid(procid,&procid_tr,&section_id);
+		if(section_id<=0)
+		{
+			printf("Stack error\n");
+			return -1;
+		}
+        if(sectstate[procid_tr][section_id-1]==1)
+		{
+            if(sectline[procid_tr][section_id]<16)
+			{
+                read_string_32(fin[procid_tr],sect[procid_tr][section_id-1][sectline[procid_tr][section_id-1]]);
+                sectline[procid_tr][section_id-1]++;
+			}
+            if(sectline[procid_tr][section_id-1]>=16||strcmp(sect[procid][section_id-1][clamp(sectline[procid_tr][section_id-1],0,31)],"section end")==0)
+			{
+				char *marker = ".SECTION_END";
+				for(int i = 0; marker[i] != '\0' && i < 31; i++) {
+					sect[procid_tr][section_id-1][clamp(sectline[procid_tr][section_id-1],0,31)][i] = marker[i];
+				}
+				sect[procid_tr][section_id-1][clamp(sectline[procid_tr][section_id-1],0,31)][strlen(marker)] = '\0';
+                sectstate[procid_tr][section_id-1]=0;
+			}
+		}
+        else if(sectstate[procid_tr][section_id-1]==2)
+		{
+            if(strcmp(sect[procid][section_id-1][sectline[procid_tr][section_id-1]],".SECTION_END")!=0)
+			{
+                run(procid_tr,sect[procid][section_id-1][sectline[procid_tr][section_id-1]]);
+			}
+			else
+			{
+                sectstate[procid_tr][section_id-1]=0;
+			}
+		}
+	}
+	else if(strcmp(_cmd,"section")==0)
+	{
+		char* op;
+		int a;
+		fscanf(fin[procid], "%s %d", op, &a);
+		if(strcmp(op,"set")==0)
+		{
+			if(a<1||a>4)
+			{
+				printf("Stack error\n");
+				return -1;
+			}
+            sectstate[procid][a-1]=1;
+		}
+		else if(strcmp(op,"run")==0)
+		{
+			if(a<1||a>4)
+			{
+				printf("Stack error\n");
+				return -1;
+			}
+            sectline[procid][a-1]=0;
+            sectstate[procid][a-1]=2;
+		}
+		else
+		{
+			printf("Invalid operation\n");
+		}
+	}
+	else if (strcmp(_cmd, "nop") == 0) {
 		read_string(fin[procid], buffer);
 		return 1;
 	} else if (strcmp(_cmd, "end") == 0) {
@@ -508,7 +622,7 @@ int run(int procid,const char *_cmd) {
 			return -1;
 		}
 	}
-	 else if(strcmp(_cmd,"exec")==0){
+	else if(strcmp(_cmd,"exec")==0){
 		  int a;
 		  fscanf(fin[procid],"%d",&a);
 		  if(a<128||a>255)
@@ -562,7 +676,7 @@ int run(int procid,const char *_cmd) {
 }
 int rbvm(int procid) {
 	char command[128];/*
-	printf("Rubidium Assembly on RbVM v0.1.1 Release 3\n");
+	printf("Rubidium Assembly on RbVM v1.11.4 Release 4\n");
 	printf("By Lithium4141\n");
 	printf("(C)2022~2025 Lithium Project LLC\n");*/
 	fin[procid] = fopen(fileloc[procid], "r");
@@ -622,7 +736,7 @@ int main()
 {
 	system("vga.exe");
 	system("cls");
-	printf("Initilazing AEOS v5.1\n");
+	printf("Initilazing AEOS v5.11\n");
 	printf("OpenSRV is intilazing...\n");
 	system("mode con cols=80 lines=25");
 	printf("[ OK ] TTyDM Initilazation Success!\n");
@@ -657,7 +771,7 @@ int main()
 	 *			   delay(500);
 }
 */
-	printf("\r[ OK ] BGIDM Initilazation Success!\n");
+	printf("[ OK ] BGIDM Initilazation Success!\n");
 	printf("[ OK ] AGeTTy Initilazation Success!\n");
 	printf("[ OK ] InfDrv Service Started!\n");
 	getkey();
@@ -821,11 +935,11 @@ int main()
 		}
 		else if(strcmp(inputBuf,"ver")==0)
 		{
-			printf("AEOS v5.11.2 Build 6397\n");
+			printf("AEOS v5.11.2 Build 7049\n");
 			printf("root@AEOS51\n");
 			printf("(C)Copyright 2022~2026 Lithium Project LLC\n");
 			printf("By Lithium4141\n");
-			printf("Release date:2026/1/30\n");
+			printf("Release date:2026/2/4\n");
 		}
 		else if(strcmp(inputBuf,"ps")==0)
 		{
@@ -848,6 +962,7 @@ int main()
 			printf("clear      shutdown poweroff   restart\n");
 			printf("reboot     pwd      ver        ps\n");
 			printf("help       kill     open       bgidm\n");
+			printf("passwd     whoami   lsusr      arm\n");
 			printf("Note:To stop a program,press Ctrl-\\\n");
 			printf("     To leave a program in background,try press Ctrl-Z\n");
 		}
@@ -868,13 +983,19 @@ int main()
                 for(int i=pid+1;i<=progs;i++)
 				{
                     strcpy(fileloc[i-1],fileloc[i]);
-					printf("[debug]Copying file pointer from %d-1(%d) to %d...\n",i,i-1,i);
-					printf("[debug]Address of fin[%d]:%d\n[debug]Address of fin[%d]:%d\n",i-1,&fin[i-1],i,&fin[i]);
-                    printf("[debug]Data of fin[%d]:%d\n[debug]Data of fin[%d]:%d\n",i-1,fin[i-1],i,fin[i]);
+					//note:debug codes are disabled
+					//printf("[debug]Copying file pointer from %d-1(%d) to %d...\n",i,i-1,i);
+					//printf("[debug]Address of fin[%d]:%d\n[debug]Address of fin[%d]:%d\n",i-1,&fin[i-1],i,&fin[i]);
+                    //printf("[debug]Data of fin[%d]:%d\n[debug]Data of fin[%d]:%d\n",i-1,fin[i-1],i,fin[i]);
 					memcpy(fin[i-1],fin[i],sizeof(fin[i]));
-					printf("[debug]Operation done successfully!\n");
-					printf("[debug]Address of fin[%d]:%d\n[debug]Address of fin[%d]:%d\n",i-1,&fin[i-1],i,&fin[i]);
-                    printf("[debug]Data of fin[%d]:%d\n[debug]Data of fin[%d]:%d\n",i-1,fin[i-1],i,fin[i]);
+					memcpy(memi[i], memi[i+1], sizeof(memi[0]));
+					memcpy(memf[i], memf[i+1], sizeof(memf[0]));
+					memcpy(memc[i], memc[i+1], sizeof(memc[0]));
+					memcpy(mems[i], mems[i+1], sizeof(mems[0]));
+					memcpy(sect[i], sect[i+1], sizeof(sect[0]));
+					//printf("[debug]Operation done successfully!\n");
+					//printf("[debug]Address of fin[%d]:%d\n[debug]Address of fin[%d]:%d\n",i-1,&fin[i-1],i,&fin[i]);
+                    //printf("[debug]Data of fin[%d]:%d\n[debug]Data of fin[%d]:%d\n",i-1,fin[i-1],i,fin[i]);
 				}
 			}
 		}
@@ -888,6 +1009,65 @@ int main()
 			}
 			printf("Openning %d:%s\n",pid,fileloc[pid]);
 			rbvm(pid);
+		}
+		else if(strcmp(inputBuf,"passwd")==0)
+		{
+			printf("Failed to open user database file:Disk I/O Error\n");
+		}
+		else if(strcmp(inputBuf,"whoami")==0)
+		{
+			printf("root\n");
+		}
+		else if(strcmp(inputBuf,"lsusr")==0)
+		{
+			printf("Users   |UID\n");
+			printf("51INIT  |0\n");
+			printf("OPENSRV |1\n");
+			printf("root    |2\n");
+		}
+		else if(strlen(inputBuf)<5&&strncmp(inputBuf,"arm",3)==0)
+		{
+			printf("Error:Invalid parameter\n");
+			printf("Usage:arm [install/update/update-repo/remove/clean-cache] <package-name> \n");
+		}
+		else if(strlen(inputBuf)>=5&&strncmp(inputBuf,"arm ",4)==0)
+		{
+			char* others=inputBuf+5;
+			if(strncmp(others,"install",7)==0)
+			{
+				printf("Reading package database...\n");
+				printf("Error:Disk I/O Error\n");
+				printf("Try rebuild package database by \"arm update-repo\"\n");
+			}
+			else if(strncmp(others,"update-repo",11)==0)
+			{
+				printf("Downloading repository index from\"http://storage.lithiumproj.ink/arm-repo/repo.idx\"...\n");
+				printf("InfDrv Fatal Error:no valid network driver or device found!\n");
+				printf("[+1] \"arm update-repo\" killed by SIGINDO(Invalid Device Operation)\n");
+			}
+			else if(strncmp(others,"update",6)==0)
+			{
+				printf("Reading package database...\n");
+				printf("Error:Disk I/O Error\n");
+				printf("Try rebuild package database by \"arm update-repo\"\n");
+			}
+			else if(strncmp(others,"remove",6)==0)
+			{
+				printf("Reading package database...\n");
+				printf("Error:Disk I/O Error\n");
+				printf("Try rebuild package database by \"arm update-repo\"\n");
+			}
+			else if(strncmp(others,"clean-cache",11)==0)
+			{
+				printf("Reading package database...\n");
+				printf("Error:Disk I/O Error\n");
+				printf("Try rebuild package database by \"arm update-repo\"\n");
+			}
+			else
+			{
+				printf("Error:Invalid parameter\n");
+				printf("Usage:arm [install/update/update-repo/remove/clean-cache] <package-name> \n");
+			}
 		}
 		else if(strcmp(inputBuf,"bgidm")==0)
 		{
