@@ -31,16 +31,16 @@ It has a graphical interface,XMS support,Rubidium Assembly support FAT32 filesys
 |Executable|MZ|MZ|RbVM|
 |High Memory/Extended Memory|✔₁|✔|✔|
 |Widechars and GB-2312|✔₂|×|×|
-|FAT32|✔₁|✔|✔|
+|FAT32|×|✔|✔|
 |Long Filename|✔₁|×|×|
-|Internet|×₃|×|×|
+|Internet|×|×|×|
 |Sound|Buzzer|×|Buzzer|
+|Package Manager|×|×|✔|
+|Future Update|×|×|Manual update/Rolling update|
 
-1:Requires a fully installation of DOS7.1 or higher version
+1:Requires a full installation of DOS7.1 or higher version
 
-2:Requires a fully installation of DOS6.22 or external CCDOS installation
-
-3:Mostly not available
+2:Requires a full installation of external CCDOS installation
 
 # How to compile
 1. You need a fully DOS environment,no matter which one you are using
