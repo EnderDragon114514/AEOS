@@ -8,7 +8,7 @@ Bug report:send an email to lithium-offical@outlook.com or commit in github
 /*
 Future update implentions:
 1. Dynamic library extensions
-2. Graphics supports
+2. RbVM graphics supports
 3. Pagefile(similar to Linux swapfile or swap parition and Windows pagefile)
 4. Hibernate(Requires pagefile)
 5. More background process
@@ -306,7 +306,7 @@ int run(int procid,const char *_cmd) {
 		} else if (d == 2) {
 			memc[procid][c] = memc[procid][a] - memc[procid][b];
 		} else if (d == 3) {
-			memf[procid][c] = memf[procid][a] - memf[procid][b];
+            memf[procid][c] = memf[procid][a] - memf[procid][b];
 		} else {
 			printf("Type error\n");
 			return -1;
@@ -735,14 +735,44 @@ int getkey()
 int main()
 {
 	system("vga.exe");
-	system("cls");
-	printf("Initilazing AEOS v5.11\n");
+    system("cls");                                     
+    printf("      A         EEEEEEEE     OOOOO            SSSS\n");
+    printf("     A A        .           O     O          S\n");
+    printf("    A   A       .          O       O        S\n");
+    printf("   A.....A      EEEEEEEE   O       O        S\n");
+    printf("  A       A     .          O       O        S\n");
+    printf(" A         A    .           O     O        S\n");
+    printf("A           A   EEEEEEEE     OOOOO     SSSS\n");
+    printf("\n");
+    printf("||===\\\\                       ||      //||\n");
+    printf("||   ||            ||         ||        ||\n");
+    printf("||===//  //==\\\\   ====  //==  ||==\\\\    ||\n");
+    printf("||       ||  ||    ||   ||    ||   ||   ||\n");
+    printf("||       \\\\==\\\\     \\\\  \\\\==  ||   || ======\n");
+    printf("\n");
+    printf("AEOS v5.11.2 Beta Build 7049 Kernel Patch 1 Community Edition\n");
+    printf("Starting up...[                                             ]");
+    printf("\rStarting up...[");
+    for(int i=1;i<=45;i++)
+    {
+        printf("#");
+        if(i>=12&&i<=30)
+        {
+            delay(155);
+        }
+        if(i<30)
+        {
+            delay(40);
+        }
+        delay(25);
+    }
+    delay(300);
+    system("cls");
+    printf("Initilazing AEOS v5.11\n");
 	printf("OpenSRV is intilazing...\n");
 	system("mode con cols=80 lines=25");
 	printf("[ OK ] TTyDM Initilazation Success!\n");
-	getkey();
 	printf("[ OK ] GKDM Initilazation Success!\n");
-	getkey();
 	printf("[ OK ] DMS Intilazation Success!\n");
 	getkey();
 	/*
@@ -766,26 +796,56 @@ int main()
 	 *			   printf("\r[   *] Initilazing BGIDM...");
 	 *			   getkey();
 	 *			   delay(500);
-	 *			   printf("\r[	] Initilazing BGIDM...");
+     *             printf("\r[    ] Initilazing BGIDM...");
 	 *			   getkey();
 	 *			   delay(500);
 }
 */
 	printf("[ OK ] BGIDM Initilazation Success!\n");
+	printf("[ OK ] ARM Initilazation Success!\n");
 	printf("[ OK ] AGeTTy Initilazation Success!\n");
 	printf("[ OK ] InfDrv Service Started!\n");
 	getkey();
 	//delay(2000);
 	getkey();
-	system("ctmouse.exe");
+    system("ctmouse.exe > NUL");
 	printf("[ OK ] CuteMouse v1.6 DOS Initilazation Success!\n");
 	printf("[FAIL] No Sound card driver found!\n");
 	printf("[FAIL] No Network card driver found!\n");
 	getkey();
-	system("mkdir ROOTFS");
+    system("mkdir ROOTFS > NUL");
+    system("mkdir SYSCFG > NUL");
 	printf("[ OK ] RTFS Driver Initilazed Successfully!\n");
-	shell:
+    printf("[ OK ] Mounted /SYSCFG\n");
+    printf("[ OK ] Mounted /ROOTFS\n");
+shell:
 	printf("Welcome to AEOS 5.1!\n");
+retry_getpwd:
+    FILE* _usrcfg=fopen("SYSCFG\\passwd.cfg","r");
+	char plen=0;
+    char pswd[65];
+	if(!_usrcfg)
+	{
+        printf("[AGeTTy:FATAL]Unable to read user configuration file:Disk I/O Error\n");
+		printf("               Resetting to default configuration...\n");
+		char* __buf;
+        sprintf(__buf,"echo %c >SYSCFG\\passwd.cfg",1);
+		system(__buf);
+        free(__buf);
+		goto retry_getpwd;
+	}
+	fscanf(_usrcfg,"%c",plen);
+	plen--;
+	if(plen>0)
+	{
+		for(int i=0;i<((char)plen);i++)
+		{
+            fscanf(_usrcfg,"%c",pswd[i]);
+			pswd[i]+=31;
+		}
+	}
+	fclose(_usrcfg);
+    //printf("%d : %s",plen,pswd);
 	while(1)
 	{
 		printf("AEOS51 login:");
@@ -807,8 +867,7 @@ int main()
 					printf("\b \b");
 					inputBuf[currentChr+1]=0;
 				}
-
-			}
+            }
 			if(key>=32&&key<=126)
 			{
 				if(currentChr>=64)
@@ -825,15 +884,59 @@ int main()
 				break;
 			}
 		}
-		if(strcmp(inputBuf,"root")==0)
+        if(strcmp(inputBuf,"root")==0&&plen<=0)
+        {            
+            printf("\n[AGeTTy:Warning]Password not set!Use \"passwd\" to set a new password!\n");
+            goto loginok;
+        }
+        printf("\nPassword:");
+        key=0,currentChr=0;
+		char inputBuf1[65];
+		memset(inputBuf1,0,sizeof(inputBuf1));
+		while(1)
 		{
-			break;
+			key=getch();
+			if(key==8||key==127)
+			{
+				currentChr--;
+				if(currentChr<0)
+				{
+					currentChr=0;
+				}
+				else
+				{
+					//printf("\b \b"); //no need for this line
+					inputBuf1[currentChr+1]=0;
+				}
+
+			}
+			if(key>=32&&key<=126)
+			{
+				if(currentChr>=64)
+				{
+					currentChr=63;
+					break;
+				}
+				inputBuf1[currentChr++]=key;
+				//printf("%c",key); //passwords should not be shown
+			}
+			if(key==3||key==9||key==10||key=='\r'||key=='\n')
+			{
+				inputBuf1[currentChr]=0;
+				break;
+			}
+		}
+		if(strcmp(inputBuf,"root")==0 && strcmp(inputBuf1,pswd)==0)
+		{
+			goto loginok;
 		}
 		printf("\nLogin incorrect\n");
 	}
+loginok:
 	system("bgidm.exe");
 	while(1)
 	{
+	agsh:
 		printf("\nroot@AEOS51:ROOTTFS/ # ");
 		int key=0,currentChr=0;
 		char inputBuf[65];
@@ -879,11 +982,11 @@ int main()
 		}
 		else if(strcmp(inputBuf,"ls")==0)
 		{
-			system("dir ROOTFS");
+            system("dir ROOTFS /b");
 		}
 		else if(strcmp(inputBuf,"ls -l")==0)
 		{
-			system("dir ROOTFS /p");
+            system("dir ROOTFS /p /b");
 		}
 		else if(strlen(inputBuf)>=6&&strncmp(inputBuf,"echo ",5)==0)
 		{
@@ -935,7 +1038,7 @@ int main()
 		}
 		else if(strcmp(inputBuf,"ver")==0)
 		{
-			printf("AEOS v5.11.2 Build 7049\n");
+            printf("AEOS v5.11.2 Build 7049 Kernel patch 1\n");
 			printf("root@AEOS51\n");
 			printf("(C)Copyright 2022~2026 Lithium Project LLC\n");
 			printf("By Lithium4141\n");
@@ -963,6 +1066,7 @@ int main()
 			printf("reboot     pwd      ver        ps\n");
 			printf("help       kill     open       bgidm\n");
 			printf("passwd     whoami   lsusr      arm\n");
+            //printf("localcfg\n");
 			printf("Note:To stop a program,press Ctrl-\\\n");
 			printf("     To leave a program in background,try press Ctrl-Z\n");
 		}
@@ -991,7 +1095,7 @@ int main()
 					memcpy(memi[i], memi[i+1], sizeof(memi[0]));
 					memcpy(memf[i], memf[i+1], sizeof(memf[0]));
 					memcpy(memc[i], memc[i+1], sizeof(memc[0]));
-					memcpy(mems[i], mems[i+1], sizeof(mems[0]));
+                    memcpy(mems[i], mems[i+1], sizeof(mems[0]));
 					memcpy(sect[i], sect[i+1], sizeof(sect[0]));
 					//printf("[debug]Operation done successfully!\n");
 					//printf("[debug]Address of fin[%d]:%d\n[debug]Address of fin[%d]:%d\n",i-1,&fin[i-1],i,&fin[i]);
@@ -1010,9 +1114,114 @@ int main()
 			printf("Openning %d:%s\n",pid,fileloc[pid]);
 			rbvm(pid);
 		}
-		else if(strcmp(inputBuf,"passwd")==0)
+        else if(strcmp(inputBuf,"passwd")==0)
 		{
-			printf("Failed to open user database file:Disk I/O Error\n");
+            FILE* _file=fopen("SYSCFG\\passwd.cfg","w");
+			if(!_file)
+			{
+				printf("Failed to open user database file:Disk I/O Error\n");
+			}
+			else
+			{
+                char inputBuf1[65],inputBuf2[65];
+                memset(inputBuf1,0,sizeof(inputBuf1));
+                memset(inputBuf2,0,sizeof(inputBuf2));    
+				while(1)
+				{
+					printf("Input new password:");
+					int key=0,currentChr=0;
+                    while(1)         
+					{
+						key=getch();
+						if(key==8||key==127)
+						{
+							currentChr--;
+							if(currentChr<0)
+							{
+								currentChr=0;
+							}
+							else
+							{
+								//printf("\b \b"); //no need for this line
+								inputBuf1[currentChr+1]=0;
+							}
+						}
+						if(key>=32&&key<=126)
+						{
+							if(currentChr>=64)
+							{
+								currentChr=63;
+								break;
+							}
+							inputBuf1[currentChr++]=key;
+							//printf("%c",key); //passwords should not be shown
+						}
+						if(key==3||key==9||key==10||key=='\r'||key=='\n')
+						{
+							inputBuf1[currentChr]=0;
+							break;
+						}
+					}
+					printf("\nRetype new password:");
+                    int key1=0,currentChr1=0;
+					while(1)
+					{
+                        key1=getch();
+                        if(key1==8||key1==127)
+						{
+                            currentChr1--;
+                            if(currentChr1<0)
+							{
+                                currentChr1=0;
+							}
+							else
+							{
+								//printf("\b \b"); //no need for this line
+                                inputBuf2[currentChr1+1]=0;
+							}
+						}
+                        if(key1==28)
+						{
+							printf("\"passwd\" forcely terminated by Ctrl-\\\n");
+							goto agsh;
+						}
+                        if(key1>=32&&key1<=126)
+						{
+                            if(currentChr1>=64)
+							{
+                                currentChr1=63;
+								break;
+							}
+                            inputBuf2[currentChr1++]=key1;
+                            //printf("%c",key1); //passwords should not be shown
+						}
+                        if(key1==3||key1==9||key1==10||key1=='\r'||key1=='\n')
+						{
+                            inputBuf2[currentChr1]=0;
+							break;
+						}
+					}
+					if(strcmp(inputBuf1,inputBuf2)==0)
+					{
+						break;
+					}
+					else
+					{
+						printf("\nInput disagree\n");
+					}
+				}
+                fclose(_file);
+                char* __buf;
+				for(int i=0;i<strlen(inputBuf1);i++)
+                {            
+                    inputBuf1[i]-=31;
+				}
+                sprintf(__buf,"echo %c%s > SYSCFG\\passwd.cfg",((char)strlen(inputBuf1)+1),inputBuf1);
+                //printf("%s\n",__buf);
+                printf("Reboot to take effects.\n");
+                system(__buf);
+                //fclose(_file);
+			}
 		}
 		else if(strcmp(inputBuf,"whoami")==0)
 		{
@@ -1025,37 +1234,78 @@ int main()
 			printf("OPENSRV |1\n");
 			printf("root    |2\n");
 		}
-		else if(strlen(inputBuf)<5&&strncmp(inputBuf,"arm",3)==0)
+		else if(strlen(inputBuf)>=4&&strncmp(inputBuf,"arm ",4)==0)
 		{
-			printf("Error:Invalid parameter\n");
-			printf("Usage:arm [install/update/update-repo/remove/clean-cache] <package-name> \n");
-		}
-		else if(strlen(inputBuf)>=5&&strncmp(inputBuf,"arm ",4)==0)
-		{
-			char* others=inputBuf+5;
+			char* others=inputBuf+4;
+			//printf("%s\n",others);
 			if(strncmp(others,"install",7)==0)
 			{
-				printf("Reading package database...\n");
-				printf("Error:Disk I/O Error\n");
-				printf("Try rebuild package database by \"arm update-repo\"\n");
+				printf("Reading package database... Done\n");
+				printf("[InfDrv:FATAL]:no valid network driver or device found!\n");
+				printf("Error:No valid interface found!\n");
+				printf("Please try again later\n");
 			}
 			else if(strncmp(others,"update-repo",11)==0)
 			{
 				printf("Downloading repository index from\"http://storage.lithiumproj.ink/arm-repo/repo.idx\"...\n");
-				printf("InfDrv Fatal Error:no valid network driver or device found!\n");
-				printf("[+1] \"arm update-repo\" killed by SIGINDO(Invalid Device Operation)\n");
+				printf("[InfDrv:FATAL]:no valid network driver or device found!\n");
+				printf("Operation failed.\n");
+				printf("Building local package databse....\n");
+				system("echo aeos-system-kernel > SYSCFG\\repo.idx");
+				system("echo bgidm >> SYSCFG\\repo.idx");
+				system("echo agsh >> SYSCFG\\repo.idx");
+				system("echo infdrv >> SYSCFG\\repo.idx");
+				system("echo opensrv >> SYSCFG\\repo.idx");
+				system("echo bgidm-dos-video-driver >> SYSCFG\\repo.idx");
+				system("echo cutemouse-dos-mouse-driver >> SYSCFG\\repo.idx");
+				system("echo msdos-system-intilazer >> SYSCFG\\repo.idx");
+				printf("Success!\n");
 			}
 			else if(strncmp(others,"update",6)==0)
 			{
-				printf("Reading package database...\n");
-				printf("Error:Disk I/O Error\n");
-				printf("Try rebuild package database by \"arm update-repo\"\n");
+				printf("Reading package database... Done\n");
+				printf("Getting version information from databse... Done\n");
+				printf("Error:all packages up to date\n");
 			}
-			else if(strncmp(others,"remove",6)==0)
+			else if(strncmp(others,"remove ",7)==0)
 			{
-				printf("Reading package database...\n");
-				printf("Error:Disk I/O Error\n");
-				printf("Try rebuild package database by \"arm update-repo\"\n");
+				printf("Reading package database... Done\n");
+				char* otherz=others+7;
+				if(strcmp(otherz,"aeos-system-kernel")==0)
+				{
+					 printf("Warning:This is your operating system kernel.Removing it can lead your operating system unable to boot!Confirm operation?[y/n]\n");
+					 int k=getch();
+					 if(k==28)
+					 {
+						 printf("\"arm remove aeos-system-kernel\" Terminated by Ctrl-\\\n");
+						 goto agsh;
+					 }
+					 else if(k=='y'||k=='Y')
+					 {
+						 printf("Removing package binaries...\n");
+						 system("del 51kern.exe");
+						 printf("Success!\n");
+					 }
+					 else
+					 {
+						 printf("Aborted.\n");
+						 goto agsh;
+					 }
+				}
+                else if(strcmp(otherz,"rbvm-runtime")==0||strcmp(otherz,"bgidm")==0||strcmp(otherz,"agsh")==0||strcmp(otherz,"infdrv")==0||strcmp(otherz,"opensrv")==0||strcmp(otherz,"cutemouse-dos-mouse-driver")==0||strcmp(otherz,"bgidm-dos-video-driver")==0)
+				{
+                    printf("Warning:This package is not an independent package but a dependency and requirement of \"aeos-system-kernel\".\n");
+                    printf("Error:Package not found!\n");
+				}
+                else if(strcmp(otherz,"msdos-system-initilazer")==0)
+                {
+                    printf("Removing package binaries...\n");
+                    printf("Failed:Operation not permitted!\n");
+                }
+				else
+				{
+					printf("Error:package not found!\n");
+				}
 			}
 			else if(strncmp(others,"clean-cache",11)==0)
 			{

@@ -13,8 +13,8 @@ Bug report:send an email to lithium-offical@outlook.com or commit in github
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#define refRate 1
-int maxRefRate=20,windowsOpening=0;
+int refRate=2;
+int maxRefRate=60,windowsOpening=0;
 
 union REGS inregs, outregs;
 
@@ -743,7 +743,7 @@ int main_dbr() {
 			line(170,240,450,240);
 			settextstyle(TRIPLEX_FONT, HORIZ_DIR, 2);
 			outtextxy(180,210,"Power Options");
-			outtextxy(180,240,"S_       |R     |E   |C      ");
+			outtextxy(180,240,"S        |R     |E   |C      ");
 			settextstyle(TRIPLEX_FONT, HORIZ_DIR,1);
 			outtextxy(190,243,"hutdown  eboot  xit  ancel");
 			if(key==27)
@@ -788,13 +788,13 @@ int main_dbr() {
 
 		if(aboutinfo==1&&tkrt%refRate==0)
 		{
-			draw_thick_rectangle(170,210,470,330,5,1,0);
+			draw_thick_rectangle(170,210,490,330,5,1,0);
 			setcolor(2);
-			line(170,240,470,240);
+			line(170,240,490,240);
 			settextstyle(TRIPLEX_FONT, HORIZ_DIR, 2);
 			outtextxy(180,210,"[X]About AEOS");
 			outtextxy(180,240,"AEOS v5.11.2 Build 7049");
-			outtextxy(180,270,"AEOS BGIDM v1.10.3 Beta 5");
+			outtextxy(180,270,"AEOS BGIDM v1.10.3 Beta 5 DBR");
 			outtextxy(190,300,"By Lithium4141");
 			if(key==27)
 			{
@@ -888,7 +888,10 @@ int main_lfr() {
 	while(1)
 	{
 		tkrt++;
-		cleardevice();
+		if(tkrt%refRate==0)
+		{
+			cleardevice();
+		}
 		setcolor(1);
 		setfillstyle(SOLID_FILL,1);
 		bar(5,477,635,457);
@@ -972,7 +975,7 @@ int main_lfr() {
 				mouse = get_mouse_position();
 			}
 		}
-		if(demoon!=0&&filemanon==0&&tkrt%(refRate/2)==0)
+        if(demoon!=0&&filemanon==0&&tkrt%refRate==0)
 		{
 			if(demoon==1)
 			{
@@ -1102,7 +1105,7 @@ int main_lfr() {
 				*/
 			}
 		}
-		if(filemanon==1&&tkrt%(refRate/2)==0)
+        if(filemanon==1&&tkrt%refRate==0)
 		{
 			setcolor(1);
 			draw_thick_rectangle(0,0,640,454,5,1,0);
@@ -1366,13 +1369,13 @@ int main_lfr() {
 		}
         if(aboutinfo==1&&tkrt%refRate==0)
 		{
-			draw_thick_rectangle(170,210,470,330,5,1,0);
+            draw_thick_rectangle(170,210,550,330,5,1,0);
 			setcolor(2);
-			line(170,240,470,240);
+            line(170,240,550,240);
 			settextstyle(TRIPLEX_FONT, HORIZ_DIR, 2);
 			outtextxy(180,210,"[X]About AEOS");
-			outtextxy(180,240,"AEOS v5.11.2 Build 7049");
-			outtextxy(180,270,"AEOS BGIDM v1.10.3 Beta 5");
+            outtextxy(180,240,"AEOS v5.11.2 Build 7049 Patch 1");
+			outtextxy(180,270,"AEOS BGIDM v1.10.3 Beta 5 LFR");
 			outtextxy(190,300,"By Lithium4141");
 			if(key==27)
 			{
@@ -1393,7 +1396,7 @@ int main_lfr() {
 		{
 			setcolor(2);
 			settextstyle(TRIPLEX_FONT,HORIZ_DIR,2);
-			outtextxy(10,10,"AEOS v5.11.2 Build 7049");
+            outtextxy(10,10,"AEOS v5.11.2 Build 7049 Kernel Patch 1");
 			char* buf;
 			sprintf(buf,"X:%d Y:%d Left key:%s Right key:%s",mouse.x,mouse.y,(mouse.left_button==1?"ON":"OFF"),(mouse.right_button==1?"ON":"OFF"));
 			outtextxy(10,27,buf);
@@ -1424,20 +1427,20 @@ int main_lfr() {
 int main()
 {
 retry_again:
-    FILE* fin=fopen("bgidm.cfg","r");
+    FILE* fin=fopen("SYSCFG\\bgidm.cfg","r");
     int a1=1,b1=0;
     if(fin==NULL)
     {
         fclose(fin);
         printf("Error:Cannot open BGIDM Configuration file\n");
-        printf("Parameter reset!\n");
-        system("echo 1 0 > bgidm.cfg");
+        printf("Resetting configuratioh to default...\n");
+        system("echo 1 0 240 1> SYSCFG\\bgidm.cfg");
         printf("Retrying...\n");
         goto retry_again;
     }
     else
     {
-        fscanf(fin,"%d %d",&a1,&b1);
+        fscanf(fin,"%d %d %d %d",&a1,&b1,&maxRefRate,&refRate);
     }
     copy_mode=b1;
     if(a1==0)
