@@ -14,7 +14,7 @@ It has a graphical interface,XMS support,Rubidium Assembly support FAT32 filesys
 |   CPU    |Intel 8086|Intel 80286|
 |   RAM    | 1085KiB  |  4096KiB  |
 |   GPU    |   VGA    |    VGA    |
-|   GRAM   | 1024KiB  |  2048KiB  |
+|   GRAM   |  16KiB   |   64KiB   |
 |  Monitor |VGA 640*480|VGA 640*480|
 | Keyboard |   PS/2   |   PS/2    |
 |  Mouse   |   PS/2   |   PS/2    |
