@@ -7,30 +7,30 @@ Bug report:send an email to lithium-offical@outlook.com or commit in github
 
 /*
 Future update implentions:
-1. Dynamic library extensions
-2. RbVM graphics supports
-3. Pagefile(similar to Linux swapfile or swap parition and Windows pagefile)
-4. Hibernate(Requires pagefile)
-5. More background process
+1. RbVM graphics supports
+2. Pagefile(similar to Linux swapfile or swap parition and Windows pagefile)
+3. Hibernate(Requires pagefile)
+4. More background process
 */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <conio.h>
 #include <dos.h>
+extern "C"{
+    #include "A:\memdef.h"
+    #include "A:\memdef1.h"
+    #include "A:\memdef2.h"
+    #include "A:\memdef3.h"
+}
 
-int getkey();
-int memi[5][128];
-float memf[5][128];
-char memc[5][128];
-int sectline[5][32];//short interger to reduce memory usage
-int sectstate[5][32];//the same as the upper one
-char mems[5][128][64];
-char sect[5][4][16][32];
-FILE *fin[5];
-char buf[256];
-char fileloc[5][64];
+int memi[maxProg][128];
+float memf[maxProg][128];
+char memc[maxProg][128];
+int sectline[maxProg][64];//short interger to reduce memory usage
+FILE* fin[maxProg];
 int progs=0;
 int clamp(int x,int a,int b) {
 	if(x<a) {
@@ -41,6 +41,50 @@ int clamp(int x,int a,int b) {
 	} else {
 		return x;
 	}
+}
+int get_uint()
+{
+	char inputBuf[64];
+	int key=0,currentChr=0;
+	memset(inputBuf,0,sizeof(inputBuf));
+	while(1)
+	{
+		key=getch();
+		if(key==8||key==127)
+		{
+			currentChr--;
+			if(currentChr<0)
+			{
+				currentChr=0;
+			}
+			else
+			{
+				printf("\b \b");
+				inputBuf[currentChr+1]=0;
+			}
+
+		}
+		if(key>=48&&key<=57)
+		{
+			if(currentChr>=64)
+			{
+				currentChr=63;
+				break;
+			}
+			inputBuf[currentChr++]=key;
+			printf("%c",key);
+		}
+		if(key==3||key==9||key==10||key=='\r'||key=='\n')
+		{
+			inputBuf[currentChr]=0;
+			break;
+		}
+		if(key==28)
+		{
+			return -2;
+		}
+	}
+    return atoi(inputBuf);
 }
 int condition(int procid,int type, int id_a, const char *_cmd, int id_b) {
 	if (type == 1) {
@@ -367,7 +411,7 @@ int run(int procid,const char *_cmd) {
 		if (memi[procid][b] != 0) {
 			memi[procid][c] = memi[procid][a] % memi[procid][b];
 		} else {
-			printf("Mod by zero error\n");
+			printf("Divide by zero error\n");
 			return -1;
 		}
 	} else if (strcmp(_cmd, "get") == 0) {
@@ -397,7 +441,7 @@ int run(int procid,const char *_cmd) {
 					}
 
 				}
-				if(key>=48&&key<=57)
+				if((key>=48&&key<=57)||key=='-')
 				{
 					if(currentChr>=64)
 					{
@@ -421,7 +465,7 @@ int run(int procid,const char *_cmd) {
 					return -2;
 				}
 			}
-			memi[procid][a]=atoi(buf);
+			memi[procid][a]=atoi(inputBuf);
 		} else if (b == 2) {
 			int _a=getch();
 			if(_a==26)
@@ -454,7 +498,7 @@ int run(int procid,const char *_cmd) {
 					}
 
 				}
-				if((key>=48&&key<=57)||key==46)
+                if((key>=48&&key<=57)||(key=='-')||(key=='.'))
 				{
 					if(currentChr>=64)
 					{
@@ -478,7 +522,7 @@ int run(int procid,const char *_cmd) {
 					return -2;
 				}
 			}
-			memf[procid][a]=atof(buf);
+			memf[procid][a]=atof(inputBuf);
 		} else {
 			printf("Type error\n");
 			return -1;
@@ -502,7 +546,7 @@ int run(int procid,const char *_cmd) {
 	} else if (strcmp(_cmd, "sset") == 0) {
 		fscanf(fin[procid], "%d", &a);
 		read_string(fin[procid], buffer);
-		if (a < 128 || a > 255) {
+        if (a < 128 || a > 192) {
 			printf("Memory error\n");
 			return -1;
 		}
@@ -511,7 +555,7 @@ int run(int procid,const char *_cmd) {
 		mems[procid][a][127] = '\0';
 	} else if (strcmp(_cmd, "scopy") == 0) {
 		fscanf(fin[procid], "%d %d", &a, &b);
-		if (a < 128 || a > 255 || b < 128 || b > 255) {
+        if (a < 128 || a > 192 || b < 128 || b > 192) {
 			printf("Memory error\n");
 			return -1;
 		}
@@ -521,7 +565,7 @@ int run(int procid,const char *_cmd) {
 		mems[procid][b][127] = '\0';
 	} else if (strcmp(_cmd, "splus") == 0) {
 		fscanf(fin[procid], "%d %d %d", &a, &b, &c);
-		if (a < 128 || a > 255 || b < 128 || b > 255 || c < 128 || c > 255) {
+        if (a < 128 || a > 192 || b < 128 || b > 192 || c < 128 || c > 192) {
 			printf("Memory error\n");
 			return -1;
 		}
@@ -586,7 +630,7 @@ int run(int procid,const char *_cmd) {
 		mems[procid][a][strcspn(mems[procid][a], "\r\n")] = '\0';
 	} else if (strcmp(_cmd, "sput") == 0) {
 		fscanf(fin[procid], "%d", &a);
-		if (a < 128 || a > 255) {
+        if (a < 128 || a > 192) {
 			printf("Memory error\n");
 			return -1;
 		}
@@ -594,7 +638,7 @@ int run(int procid,const char *_cmd) {
 		printf("%s\n", mems[procid][a]);
 	} else if (strcmp(_cmd, "ssize") == 0) {
 		fscanf(fin[procid], "%d %d", &a, &b);
-		if (a < 128 || a > 255 || b < 0 || b > 127) {
+        if (a < 128 || a > 192 || b < 0 || b > 127) {
 			printf("Memory error\n");
 			return -1;
 		}
@@ -625,7 +669,7 @@ int run(int procid,const char *_cmd) {
 	else if(strcmp(_cmd,"exec")==0){
 		  int a;
 		  fscanf(fin[procid],"%d",&a);
-		  if(a<128||a>255)
+          if(a<128||a>192)
 		  {
 				printf("Memory error");
 				return -1;
@@ -666,7 +710,305 @@ int run(int procid,const char *_cmd) {
 			return -1;
 		}
 		memc[procid][id_a]=getch();
-	} else if (strcmp(_cmd, "clear") == 0) {
+	}
+	else if(strcmp(_cmd,"loadlib")==0)
+	{
+		char* libname;
+		fscanf(fin[procid],"%s ",libname);
+		if(strcmp(libname,"extmath.lib")==0)
+		{
+			fscanf(fin[procid],"%s",_cmd);
+			if(strcmp(_cmd,"sqrt")==0)
+			{
+				int a,b,c;
+				fscanf(fin[procid],"%d %d %d",&a,&b,&c);
+				if(b<0||b>127||c<0||c>127)
+				{
+					printf("Memory error\n");
+					return -1;
+				}
+				if(a==1)
+				{
+					memi[procid][c]=sqrt(memi[procid][b]);
+				}
+				else if(a==2)
+				{
+					memc[procid][c]=sqrt(memc[procid][b]);
+				}
+				else if(a==3)
+				{
+					memf[procid][c]=sqrt(memf[procid][b]);
+				}
+				else
+				{
+					printf("Type error\n");
+					return -1;
+				}
+			}
+			else if(strcmp(_cmd,"pow")==0)
+			{
+				int a,b,c,d;
+				fscanf(fin[procid],"%d %d %d %d",&a,&b,&c,&d);
+				if(b<0||b>127||c<0||c>127||d<0||d>127)
+				{
+					printf("Memory error\n");
+					return -1;
+				}
+				if(a==1)
+				{
+					memi[procid][d]=pow(memi[procid][b],memi[procid][c]);
+				}
+				else if(a==2)
+				{
+					memc[procid][d]=pow(memc[procid][b],memc[procid][c]);
+				}
+				else if(a==3)
+				{
+					memf[procid][d]=pow(memf[procid][b],memf[procid][c]);
+				}
+				else
+				{
+					printf("Type error\n");
+					return -1;
+				}
+			}
+			else if(strcmp(_cmd,"sin")==0)
+			{
+				int a,b,c;
+				fscanf(fin[procid],"%d %d %d",&a,&b,&c);
+				if(b<0||b>127||c<0||c>127)
+				{
+					printf("Memory error\n");
+					return -1;
+				}
+				if(a==1)
+				{
+					memi[procid][c]=sin(memi[procid][b]);
+				}
+				else if(a==2)
+				{
+					memc[procid][c]=sin(memc[procid][b]);
+				}
+				else if(a==3)
+				{
+					memf[procid][c]=sin(memf[procid][b]);
+				}
+				else
+				{
+					printf("Type error\n");
+					return -1;
+				}
+			}
+			else if(strcmp(_cmd,"cos")==0)
+			{
+				int a,b,c;
+				fscanf(fin[procid],"%d %d %d",&a,&b,&c);
+				if(b<0||b>127||c<0||c>127)
+				{
+					printf("Memory error\n");
+					return -1;
+				}
+				if(a==1)
+				{
+					memi[procid][c]=cos(memi[procid][b]);
+				}
+				else if(a==2)
+				{
+					memc[procid][c]=cos(memc[procid][b]);
+				}
+				else if(a==3)
+				{
+					memf[procid][c]=cos(memf[procid][b]);
+				}
+				else
+				{
+					printf("Type error\n");
+					return -1;
+				}
+			}
+			else if(strcmp(_cmd,"tan")==0)
+			{
+				int a,b,c;
+				fscanf(fin[procid],"%d %d %d",&a,&b,&c);
+				if(b<0||b>127||c<0||c>127)
+				{
+					printf("Memory error\n");
+					return -1;
+				}
+				if(a==1)
+				{
+					int a1=memi[procid][b];
+					if (abs(memi[procid][b]) > PI/2) {
+                        a1 = fmod(memi[procid][b],PI);
+						if (a1 > (PI/2)) a1 -= PI;
+						if (a1 < -1*(PI/2)) a1 += PI;
+					}
+					if (abs(abs(a1) - PI/2) < 1e-10) {
+						printf("Tan calculation error\n");
+						return -1;
+					}
+					if (abs(cos(a1)) < 1e-10) {
+						printf("Tan calculation error\n");
+						return -1;
+					}
+					memi[procid][c]=tan(memi[procid][b]);
+				}
+				else if(a==2)
+				{
+					int a2=memc[procid][b];
+					if (abs(memc[procid][b]) > PI/2) {
+                        a2 = fmod(memc[procid][b],PI);
+						if (a2 > (PI/2)) a2 -= PI;
+						if (a2 < -1*(PI/2)) a2 += PI;
+					}
+					if (abs(abs(a2) - PI/2) < 1e-7) {
+						printf("Tan calculation error\n");
+						return -1;
+					}
+					if (abs(cos(a2)) < 1e-7) {
+						printf("Tan calculation error\n");
+						return -1;
+					}
+					memc[procid][c]=tan(memc[procid][b]);
+				}
+				else if(a==3)
+				{
+					int a3=memf[procid][b];
+					if (fabs(memf[procid][b]) > PI/2) {
+						a3 = fmod(memf[procid][b],PI);
+						if (a3 > (PI/2)) a3 -= PI;
+						if (a3 < -1*(PI/2)) a3 += PI;
+					}
+					if (fabs(fabs(a3) - PI/2) < 1e-7) {
+						printf("Tan calculation error\n");
+						return -1;
+					}
+					if (fabs(cos(a3)) < 1e-7) {
+						printf("Tan calculation error\n");
+						return -1;
+					}
+					memf[procid][c]=tan(memf[procid][b]);
+				}
+				else
+				{
+					printf("Type error\n");
+					return -1;
+				}
+			}
+			else if(strcmp(_cmd,"log")==0)
+			{
+				int a,b,c;
+				fscanf(fin[procid],"%d %d %d",&a,&b,&c);
+				if(b<0||b>127||c<0||c>127)
+				{
+					printf("Memory error\n");
+					return -1;
+				}
+				if(a==1)
+				{
+					if(memi[procid][b]<=0)
+					{
+						printf("log invalid parameter\n");
+						return -1;
+					}
+					memi[procid][c]=log10(memi[procid][b]);
+				}
+				else if(a==2)
+				{
+					if(memc[procid][b]<=0)
+					{
+						printf("log invalid parameter\n");
+						return -1;
+					}
+					memc[procid][c]=log10(memc[procid][b]);
+				}
+				else if(a==3)
+				{
+					if(memf[procid][b]<=0)
+					{
+						printf("log invalid parameter\n");
+						return -1;
+					}
+					memf[procid][c]=log10(memf[procid][b]);
+				}
+				else
+				{
+					printf("Type error\n");
+					return -1;
+				}
+			}
+			else if(strcmp(_cmd,"ln")==0)
+			{
+				int a,b,c;
+				fscanf(fin[procid],"%d %d %d",&a,&b,&c);
+				if(b<0||b>127||c<0||c>127)
+				{
+					printf("Memory error\n");
+					return -1;
+				}
+				if(a==1)
+				{
+					if(memi[procid][b]<=0)
+					{
+						printf("log invalid parameter\n");
+						return -1;
+					}
+					memi[procid][c]=log(memi[procid][b]);
+				}
+				else if(a==2)
+				{
+					if(memc[procid][b]<=0)
+					{
+						printf("log invalid parameter\n");
+						return -1;
+					}
+					memc[procid][c]=log(memc[procid][b]);
+				}
+				else if(a==3)
+				{
+					if(memf[procid][b]<=0)
+					{
+						printf("log invalid parameter\n");
+						return -1;
+					}
+					memf[procid][c]=log(memf[procid][b]);
+				}
+				else
+				{
+					printf("Type error\n");
+					return -1;
+				}
+			}else if(strcmp(_cmd,"getpi")==0)
+			{
+				int a,b;
+				fscanf(fin[procid],"%d %d",&a,&b);
+				if(b<0||b>127)
+				{
+					printf("Memory error\n");
+					return -1;
+				}
+				if(a==1)
+				{
+					memi[procid][b]=PI;
+				}
+				else if(a==2)
+				{
+					memc[procid][b]=PI;
+				}
+				else if(a==3)
+				{
+					memf[procid][b]=PI;
+				}
+				else
+				{
+					printf("Type error\n");
+					return -1;
+				}
+			}
+
+		}
+	}
+	else if (strcmp(_cmd, "clear") == 0) {
 		system("cls");
 	} else {
 		printf("Invalid operation\n");
@@ -731,26 +1073,25 @@ int getkey()
 		return -1;
 	}
 }
-
 int main()
 {
 	system("vga.exe");
     system("cls");                                     
-    printf("      A         EEEEEEEE     OOOOO            SSSS\n");
-    printf("     A A        .           O     O          S\n");
-    printf("    A   A       .          O       O        S\n");
-    printf("   A.....A      EEEEEEEE   O       O        S\n");
-    printf("  A       A     .          O       O        S\n");
-    printf(" A         A    .           O     O        S\n");
-    printf("A           A   EEEEEEEE     OOOOO     SSSS\n");
+    printf("      A         EEEEEEEE     OOOOO            SSSS   555555       11      11  \n");
+    printf("     A A        .           O     O          S       5          ..11    ..11  \n");
+    printf("    A   A       .          O       O        S        5            11      11  \n");
+    printf("   A.....A      EEEEEEEE   O       O        S        555555       11      11  \n");
+    printf("  A       A     .          O       O        S             5       11      11  \n");
+    printf(" A         A    .           O     O        S              5  OO   11      11  \n");
+    printf("A           A   EEEEEEEE     OOOOO     SSSS          555555  OO ..11..  ..11..\n");
     printf("\n");
-    printf("||===\\\\                       ||      //||\n");
-    printf("||   ||            ||         ||        ||\n");
-    printf("||===//  //==\\\\   ====  //==  ||==\\\\    ||\n");
-    printf("||       ||  ||    ||   ||    ||   ||   ||\n");
-    printf("||       \\\\==\\\\     \\\\  \\\\==  ||   || ======\n");
+    printf("||===\\\\                       ||      //||      \n");
+    printf("||   ||            ||         ||        ||       \n");
+    printf("||===//  //==\\\\   ====  //==  ||==\\\\    ||              _     _\n");
+    printf("||       ||  ||    ||   ||    ||   ||   ||              _|   | |\n");
+    printf("||       \\\\==\\\\     \\\\  \\\\==  ||   || ======       \\/   _| . |_|\n");
     printf("\n");
-    printf("AEOS v5.11.2 Beta Build 7049 Kernel Patch 1 Community Edition\n");
+    printf("AEOS v5.11.2 Beta 5 Build 7049 Kernel Patch 1 Community Edition\n");
     printf("Starting up...[                                             ]");
     printf("\rStarting up...[");
     for(int i=1;i<=45;i++)
@@ -760,6 +1101,10 @@ int main()
         {
             delay(155);
         }
+        if(i==20)
+		{
+			system("ctmouse.exe > NUL");
+		}
         if(i<30)
         {
             delay(40);
@@ -808,7 +1153,6 @@ int main()
 	getkey();
 	//delay(2000);
 	getkey();
-    system("ctmouse.exe > NUL");
 	printf("[ OK ] CuteMouse v1.6 DOS Initilazation Success!\n");
 	printf("[FAIL] No Sound card driver found!\n");
 	printf("[FAIL] No Network card driver found!\n");
@@ -998,7 +1342,7 @@ loginok:
 			char* others=inputBuf+5;
 			char file[130]="ROOTFS\\";
 			strcat(file,others);
-			if(progs>=5)
+			if(progs>=maxProg)
 			{
 				printf("Error:No enough memory to execute other programs!Close at least one program to continue...\n");
 				continue;
@@ -1066,7 +1410,7 @@ loginok:
 			printf("reboot     pwd      ver        ps\n");
 			printf("help       kill     open       bgidm\n");
 			printf("passwd     whoami   lsusr      arm\n");
-            //printf("localcfg\n");
+            printf("syscfg\n");
 			printf("Note:To stop a program,press Ctrl-\\\n");
 			printf("     To leave a program in background,try press Ctrl-Z\n");
 		}
@@ -1283,8 +1627,16 @@ loginok:
 					 else if(k=='y'||k=='Y')
 					 {
 						 printf("Removing package binaries...\n");
-						 system("del 51kern.exe");
-						 printf("Success!\n");
+						 int ret=system("del 51kern.exe");
+						 if(ret==0)
+						 {
+							 printf("Success!\n");
+						 }
+						 else
+						 {
+							 printf("Error:Failed to remove package binaries.\n");
+							 printf("Error code:%d",ret);
+						 }
 					 }
 					 else
 					 {
@@ -1297,10 +1649,34 @@ loginok:
                     printf("Warning:This package is not an independent package but a dependency and requirement of \"aeos-system-kernel\".\n");
                     printf("Error:Package not found!\n");
 				}
-                else if(strcmp(otherz,"msdos-system-initilazer")==0)
-                {
-                    printf("Removing package binaries...\n");
-                    printf("Failed:Operation not permitted!\n");
+                else if(strcmp(otherz,"msdos-system-intilazer")==0)
+				{
+					printf("Warning:This is your operating system kernel.Removing it can lead your operating system unable to boot!Confirm operation?[y/n]\n");
+					int k=getch();
+					if(k==28)
+					{
+						printf("\"arm remove msdos-system-initilazer\" Terminated by Ctrl-\\\n");
+						goto agsh;
+					}
+					else if(k=='y'||k=='Y')
+					{
+						printf("Removing package binaries...\n");
+						int ret=system("del command.exe io.sys msdos.sys");
+						if(ret==0)
+						{
+							printf("Success!\n");
+						}
+						else
+						{
+							printf("Error:Failed to remove package binaries.\n");
+							printf("Error code:%d",ret);
+						}
+					}
+					else
+					{
+						printf("Aborted.\n");
+						goto agsh;
+					}
                 }
 				else
 				{
@@ -1309,14 +1685,101 @@ loginok:
 			}
 			else if(strncmp(others,"clean-cache",11)==0)
 			{
-				printf("Reading package database...\n");
-				printf("Error:Disk I/O Error\n");
-				printf("Try rebuild package database by \"arm update-repo\"\n");
+				printf("Reading package database... Done\n");
+				printf("Scanning unused package...  Done\n");
+				printf("Scanning cache files...     Done\n");
+				printf("Successs!\n");
+			}
+			else if(strncmp(others,"list",4)==0)
+			{
+				system("type SYSCFG\\repo.idx");
 			}
 			else
 			{
 				printf("Error:Invalid parameter\n");
-				printf("Usage:arm [install/update/update-repo/remove/clean-cache] <package-name> \n");
+				printf("Usage:arm [install/update/update-repo/remove/clean-cache/list] <package-name> \n");
+			}
+		}
+		else if(strlen(inputBuf)>=7&&strncmp(inputBuf,"syscfg ",7)==0)
+		{
+			char* others=inputBuf+7;
+			if(strcmp(others,"bgidm")==0)
+			{
+                int a=1,b=0,c=60,d=1;
+                printf("Select Rendering mode:1. Legacy frame rendering  2. Double-buffered rendering");
+				while(1)
+				{
+					int k=getch();
+					if(k=='1')
+					{
+						a=1;
+						break;
+					}
+					else if(k=='2')
+					{
+						a=0;
+						break;
+					}
+					else if(k==28)
+					{
+						printf("\"syscfg bgidm\" terminated by Ctrl-\\\n");
+						goto agsh;
+					}
+				}
+				if(a==0)
+				{
+                    printf("\nCopy mode for double-buffered rendering?[y/n]");
+					while(1)
+					{
+						int k=getch();
+						if(k=='y'||k=='Y')
+						{
+							b=1;
+							break;
+						}
+						else if(k=='n'||k=='N')
+						{
+							b=0;
+							break;
+						}
+						else if(k==28)
+						{
+							printf("\"syscfg bgidm\" terminated by Ctrl-\\\n");
+							goto agsh;
+						}
+					}
+				}
+				printf("\nMaximum Render FPS:");
+				c=get_uint();
+				if(c==-2)
+				{
+					printf("\"syscfg bgidm\" terminated by Ctrl-\\\n");
+					goto agsh;
+				}
+			redo:
+				printf("\nRender tick delay(Minimum 1):");
+				d=get_uint();
+				if(c==0)
+				{
+					printf("Error:Invalid configuration\n");
+					goto redo;
+				}
+				if(c==-2)
+				{
+					printf("\"syscfg bgidm\" terminated by Ctrl-\\\n");
+					goto agsh;
+				}
+				char* buf;
+				sprintf(buf,"echo %d %d %d %d > SYSCFG\\bgidm.cfg",a,b,c,d);
+                system(buf);
+			}
+			else if(strcmp(others,"agetty")==0)
+			{
+				printf("Error:password can only modified by \"passwd\"\n");
+			}
+			else
+			{
+				printf("Usage:syscfg [bgidm/agetty]\n");
 			}
 		}
 		else if(strcmp(inputBuf,"bgidm")==0)
