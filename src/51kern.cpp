@@ -1,7 +1,6 @@
 /*
 AEOS v5.11.2 Kernel and TTy
 This version is still a beta version(not stable),which means there will be some bugs,and it will be fixed in future updates
-Note:STOP ASKING ME TO MAKE THE LIBRARY EXTENSION FOR RBVM!I WILL IMPLENT IT!
 Bug report:send an email to lithium-offical@outlook.com or commit in github
 */
 
@@ -10,7 +9,6 @@ Future update implentions:
 1. RbVM graphics supports
 2. Pagefile(similar to Linux swapfile or swap parition and Windows pagefile)
 3. Hibernate(Requires pagefile)
-4. More background process
 */
 
 #include <stdio.h>
@@ -26,12 +24,276 @@ extern "C"{
     #include "A:\memdef3.h"
 }
 
+
+unsigned long get_disk_total_size(char drive) {
+	union REGS regs;
+	regs.h.ah = 0x36;
+	regs.h.dl = drive;
+	int86(0x21, &regs, &regs);
+	if(regs.x.ax == 0xFFFF) {
+		return 0;
+	}	unsigned long total_sectors = regs.x.dx * regs.x.ax;
+	unsigned long total_bytes = total_sectors * regs.x.cx;
+		return total_bytes;
+}
+unsigned int get_640_mem_kb() {
+	unsigned int kb;
+    asm {
+        int 12h
+        mov kb, ax
+	}
+	return kb;
+}
+unsigned int get_vram_vga_kb() {
+	union REGS regs;
+	regs.x.ax = 0x1A00;
+	int86(0x10, &regs, &regs);
+	if(regs.h.al != 0x1A) {
+		return 0;
+	}
+	switch(regs.h.bl) {
+		case 0x01:
+		case 0x02:
+		case 0x03:
+		case 0x04:
+			return 64;
+		case 0x05:
+		case 0x06:
+		case 0x07:
+			return ((regs.h.bl - 4) * 64);
+		case 0x08:
+			return 256;
+		case 0x09:
+		case 0x0A:
+		case 0x0B:
+			return 256 << (regs.h.bl - 8);
+		default:
+			return 0;
+	}
+}/*
+unsigned int get_xms_mem_kb() {
+	union REGS regs;
+    unsigned int rtv;
+	regs.x.ax = 0x4300;
+	int86(0x2F, &regs, &regs);
+	if(regs.h.al != 0x80) {
+		return 0;
+	}
+	regs.x.ax = 0x4310;
+	int86(0x2F, &regs, &regs);
+    asm {
+        mov ah, 08h
+        call es:bx
+        mov ax, dx
+        add ax, 0
+        mov rtv,ax
+	}
+    return rtv;
+}*/
+float get_total_mem_mb()
+{
+    return (get_640_mem_kb()+0/*get_xms_mem_kb*/)/1024;
+}
+float get_total_disk_mb()
+{
+	return get_disk_total_size(0)/1024/1024;
+}int get_cpu_level() {
+	unsigned short flags1, flags2;
+	asm {
+        pushf
+        pop ax
+        mov flags1, ax
+	}
+    asm {
+        mov ax, flags1
+        xor ax, 0xF000
+        push ax
+        popf
+        pushf
+        pop ax
+        mov flags2, ax
+	}
+    if ((flags1 ^ flags2) & 0xF000) {
+		return 1;
+	}
+	return 0;
+}
+
 int memi[maxProg][128];
 float memf[maxProg][128];
 char memc[maxProg][128];
 int sectline[maxProg][64];//short interger to reduce memory usage
 FILE* fin[maxProg];
 int progs=0;
+int SN_PORT=1,AGSH_STYLE=1;
+#define COM1 0x3F8
+#define COM2 0x2F8
+#define COM3 0x3E8
+#define COM4 0x2E8
+#define ERR_DISK_IO 0x3C
+#define ERR_NET_FAIL 0x3A
+#define ERR_TIMEOUT 0x3B
+#define SYS_KILL -1
+#define NET_SEG_INIT 0xAE
+#define NET_SEG_ACK 0xFD
+#define NET_SEG_NAK 0xFE
+#define NET_SEG_ETX 0xFA
+#define NET_SEG_RTX 0xFB
+#define RX_BUFFER_SIZE 64
+#define MAX_WAIT_TICK 524288
+int txspd=0;
+void sernet_init(int port, int baud) {
+	int divisor = 115200 / baud;
+	outportb(port + 3, 0x80);
+	outportb(port, divisor & 0xFF);
+	outportb(port + 1, divisor >> 8);
+	outportb(port + 3, 0x03);
+	outportb(port + 4, 0x00);
+	outportb(port + 1, 0x01);
+}
+int sernet_send_byte(int port, unsigned char data) {
+	outportb(port, data);
+	delay(1);
+}
+char sernet_recv_byte(int port) {
+	if(inportb(port + 5) & 0x01) {
+		return inportb(port);
+	}
+	return ERR_TIMEOUT;
+}
+int sernet_wtf(int port,char* url,char* filename)//wtf is write to file,not what the f**k
+{
+	FILE* fout=fopen(filename,"w");
+	if(!fout)
+	{
+		return ERR_DISK_IO;
+	}
+    unsigned long cnt=0;
+	sernet_send_byte(port,NET_SEG_INIT);
+	while(sernet_recv_byte(port)!=NET_SEG_INIT)
+	{
+		cnt++;
+        if(cnt%MAX_WAIT_TICK==0)
+		{
+            printf("\rWarning:Network card is not responding after %i seconds!Is the network card responding?Press Ctrl-\\ to forcely terminate this process.\n",cnt/MAX_WAIT_TICK);
+		}
+		if(getkey()==28)
+		{
+			return SYS_KILL;
+		}
+	}
+	char buf[64];
+resend_url:
+	cnt=0;
+	sprintf(buf,"GET:%s",url);
+	for(int i=0;i<strlen(buf);i++)
+	{
+		sernet_send_byte(port,buf[i]);
+	}
+	while(1)
+	{
+		cnt++;
+        if(cnt%MAX_WAIT_TICK==0)
+		{
+            printf("\rWarning:Network card is not responding after %i seconds!Is the network card responding?Press Ctrl-\\ to forcely terminate this process.\n",cnt/MAX_WAIT_TICK);
+		}
+		if(getkey()==28)
+		{
+			fclose(fout);
+			return SYS_KILL;
+		}
+		int ret=sernet_recv_byte(port);
+		if(ret==NET_SEG_ACK)
+		{
+			break;
+		}
+		else if(ret==NET_SEG_NAK)
+		{
+			goto resend_url;
+		}
+	}
+	char buf1[64];
+	memset(buf,0,sizeof(buf));
+	memset(buf1,0,sizeof(buf));
+	int sum=0,datacnt=0,datacnt_tr=0;
+	cnt=0;
+	while(1)
+	{
+		cnt++;
+		datacnt++;
+		if(getkey()==28)
+		{
+			fclose(fout);
+			return SYS_KILL;
+		}
+		int ret=sernet_recv_byte(port);
+		if(ret==NET_SEG_ETX)
+		{
+			fprintf(fout,"%s",buf);
+			break;
+		}
+		else if(ret==ERR_NET_FAIL)
+		{
+			fclose(fout);
+			return ERR_NET_FAIL;
+		}
+        memcpy(buf1,buf,sizeof(buf));
+		sprintf(buf,"%s%c",buf1,ret);
+		sum+=ret;
+		if(cnt%RX_BUFFER_SIZE==0)
+		{
+			char sum_buf[10];
+			sprintf(sum_buf,"%d",sum);
+            unsigned long cnt1=0;
+			for(int i=0;i<strlen(sum_buf);i++)
+			{
+				if(getkey()==28)
+				{
+					fclose(fout);
+					return SYS_KILL;
+				}
+				sernet_send_byte(port,sum_buf[i]);
+			}
+			while(1)
+			{
+                char ret=sernet_recv_byte(port);
+				cnt1++;
+                if(cnt1%MAX_WAIT_TICK==0)
+				{
+                    printf("\rWarning:Network card is not responding after %i seconds!Is the network card responding?Press Ctrl-\\ to forcely terminate this process.\n",cnt1/MAX_WAIT_TICK);
+				}
+				if(getkey()==28)
+				{
+					fclose(fout);
+					return SYS_KILL;
+				}
+				if(ret==NET_SEG_ACK)
+				{
+					fprintf(fout,"%s",buf);
+					cnt=0;
+					datacnt_tr=datacnt;
+					sernet_send_byte(port,NET_SEG_ACK);
+					break;
+				}
+				else if(ret==NET_SEG_NAK)
+				{
+					memset(buf,0,sizeof(buf));
+					memset(buf1,0,sizeof(buf1));
+					cnt=0;
+					datacnt=datacnt_tr;
+                    sernet_send_byte(port,NET_SEG_NAK);
+					break;
+				}
+			}
+			txspd=datacnt/256;
+			printf("\rCurrent speed:%dByte/frame",txspd);
+		}
+	}
+	printf("\nTransmittion Finish!\n");
+	fclose(fout);
+	return 0;
+}
+
 int clamp(int x,int a,int b) {
 	if(x<a) {
 		return a;
@@ -496,7 +758,6 @@ int run(int procid,const char *_cmd) {
 						printf("\b \b");
 						inputBuf[currentChr+1]=0;
 					}
-
 				}
                 if((key>=48&&key<=57)||(key=='-')||(key=='.'))
 				{
@@ -1076,7 +1337,59 @@ int getkey()
 int main()
 {
 	system("vga.exe");
-    system("cls");                                     
+    FILE* verifyPkg=fopen("SYSCFG\\pkg.idx","r");
+	if(!verifyPkg)
+	{
+		system("echo aeos-system-kernel >> SYSCFG\\pkg.idx");
+		system("echo bgidm >> SYSCFG\\pkg.idx");
+		system("echo agsh >> SYSCFG\\pkg.idx");
+		system("echo infdrv >> SYSCFG\\pkg.idx");
+		system("echo opensrv >> SYSCFG\\pkg.idx");
+		system("echo bgidm-dos-video-driver >> SYSCFG\\pkg.idx");
+		system("echo cutemouse-dos-mouse-driver >> SYSCFG\\pkg.idx");
+        system("echo msdos-system-initilazer >> SYSCFG\\pkg.idx");
+	}
+    else
+    {
+        fclose(verifyPkg);
+    }
+retry_getagshcfg:
+	FILE* _fc=fopen("SYSCFG\\agsh.cfg","r");
+	if(!_fc)
+	{
+		printf("[AGeTTy:FATAL]Unable to read shell configuration file:Disk I/O Error\n");
+		printf("              Resetting to default configuration...\n");
+		char* __buf;
+        //*debug*/system("pause");
+		system("echo 1 1 > SYSCFG\\agsh.cfg");
+		free(__buf);
+		goto retry_getagshcfg;
+	}
+    fscanf(_fc,"%d %d",&SN_PORT,&AGSH_STYLE);
+	if(SN_PORT==1)
+	{
+		SN_PORT=COM1;
+	}
+	else if(SN_PORT==2)
+	{
+		SN_PORT=COM2;
+	}
+	else if(SN_PORT==3)
+	{
+		SN_PORT=COM3;
+	}
+	else if(SN_PORT==4)
+	{
+		SN_PORT=COM4;
+	}
+	else
+	{
+		SN_PORT=COM1;
+	}
+	fclose(_fc);
+    system("mkdir ROOTFS > NUL");
+    system("mkdir SYSCFG > NUL");
+    system("cls");
     printf("      A         EEEEEEEE     OOOOO            SSSS   555555       11      11  \n");
     printf("     A A        .           O     O          S       5          ..11    ..11  \n");
     printf("    A   A       .          O       O        S        5            11      11  \n");
@@ -1087,17 +1400,17 @@ int main()
     printf("\n");
     printf("||===\\\\                       ||      //||      \n");
     printf("||   ||            ||         ||        ||       \n");
-    printf("||===//  //==\\\\   ====  //==  ||==\\\\    ||              _     _\n");
-    printf("||       ||  ||    ||   ||    ||   ||   ||              _|   | |\n");
-    printf("||       \\\\==\\\\     \\\\  \\\\==  ||   || ======       \\/   _| . |_|\n");
+    printf("||===//  //==\\\\   ====  //==  ||==\\\\    ||                    _\n");
+    printf("||       ||  ||    ||   ||    ||   ||   ||             |_|   | |\n");
+    printf("||       \\\\==\\\\     \\\\  \\\\==  ||   || ======       \\/    | . |_|\n");
     printf("\n");
-    printf("AEOS v5.11.2 Beta 5 Build 7049 Kernel Patch 1 Community Edition\n");
-    printf("Starting up...[                                             ]");
+    printf("AEOS v5.11.2 Beta 6 Build 7611 Kernel Patch 4 Community Edition\n");
+    printf("Starting up...[                                               ]");
     printf("\rStarting up...[");
-    for(int i=1;i<=45;i++)
+    for(int i=1;i<=47;i++)
     {
         printf("#");
-        if(i>=12&&i<=30)
+        if(i>=12&&i<=31)
         {
             delay(155);
         }
@@ -1105,6 +1418,10 @@ int main()
 		{
 			system("ctmouse.exe > NUL");
 		}
+        if(i==8)
+        {
+            sernet_init(SN_PORT,115200);
+        }   
         if(i<30)
         {
             delay(40);
@@ -1117,7 +1434,7 @@ int main()
 	printf("OpenSRV is intilazing...\n");
 	system("mode con cols=80 lines=25");
 	printf("[ OK ] TTyDM Initilazation Success!\n");
-	printf("[ OK ] GKDM Initilazation Success!\n");
+    printf("[ OK ] SCM Initilazation Success!\n");
 	printf("[ OK ] DMS Intilazation Success!\n");
 	getkey();
 	/*
@@ -1155,10 +1472,11 @@ int main()
 	getkey();
 	printf("[ OK ] CuteMouse v1.6 DOS Initilazation Success!\n");
 	printf("[FAIL] No Sound card driver found!\n");
-	printf("[FAIL] No Network card driver found!\n");
+    //sernet_init(SN_PORT,115200);
+	printf("[ OK ] Network card driver Initilazation Success!\n");
 	getkey();
-    system("mkdir ROOTFS > NUL");
-    system("mkdir SYSCFG > NUL");
+    //system("mkdir ROOTFS > NUL");
+    //system("mkdir SYSCFG > NUL");
 	printf("[ OK ] RTFS Driver Initilazed Successfully!\n");
     printf("[ OK ] Mounted /SYSCFG\n");
     printf("[ OK ] Mounted /ROOTFS\n");
@@ -1178,18 +1496,19 @@ retry_getpwd:
         free(__buf);
 		goto retry_getpwd;
 	}
-	fscanf(_usrcfg,"%c",plen);
+	fscanf(_usrcfg,"%c",&plen);
 	plen--;
 	if(plen>0)
 	{
 		for(int i=0;i<((char)plen);i++)
 		{
-            fscanf(_usrcfg,"%c",pswd[i]);
+            fscanf(_usrcfg,"%c",&pswd[i]);
 			pswd[i]+=31;
 		}
 	}
 	fclose(_usrcfg);
     //printf("%d : %s",plen,pswd);
+    //*debug_agshstyle*/printf("%d %d ",SN_PORT,AGSH_STYLE);
 	while(1)
 	{
 		printf("AEOS51 login:");
@@ -1278,10 +1597,35 @@ retry_getpwd:
 	}
 loginok:
 	system("bgidm.exe");
+    printf("\n");
 	while(1)
 	{
 	agsh:
-		printf("\nroot@AEOS51:ROOTTFS/ # ");
+		if(AGSH_STYLE==1)
+		{
+            printf("root@AEOS51:ROOTFS/ # ");
+		}
+		else if(AGSH_STYLE==2)
+		{
+            printf("\x1B[47mroot\x1B[40m>ROOTFS/> ");
+		}
+		else if(AGSH_STYLE==3)
+		{
+            printf("ROOTFS/ # ");
+		}
+		else if(AGSH_STYLE==4)
+		{
+            printf("ROOTFS:\\>");
+		}
+		else if(AGSH_STYLE==5)
+		{
+			printf("----(root@AEOS51)-[ROOTFS/]\n");
+			printf("|--# ");
+		}
+		else
+		{
+			printf("root@AEOS51:ROOTFS/ # ");
+		}
 		int key=0,currentChr=0;
 		char inputBuf[65];
 		memset(inputBuf,0,sizeof(inputBuf));
@@ -1340,6 +1684,11 @@ loginok:
 		else if(strlen(inputBuf)>=6&&strncmp(inputBuf,"exec ",5)==0)
 		{
 			char* others=inputBuf+5;
+			if(strpbrk(others, "|&;<>`$\"\'\\/!*?[]{}()~") != NULL) {
+				printf("Invalid syntax!\n");
+				printf("[+1]%s terminated by SIGINOS(Invalid Operation Syntax)",inputBuf);
+				goto agsh;
+			}
 			char file[130]="ROOTFS\\";
 			strcat(file,others);
 			if(progs>=maxProg)
@@ -1362,19 +1711,19 @@ loginok:
 		}
 		else if(strcmp(inputBuf,"shutdown")==0)
 		{
-			system("shutdown s");
+            return 23;
 		}
 		else if(strcmp(inputBuf,"poweroff")==0)
 		{
-			system("shutdown s");
+            return 23;
 		}
 		else if(strcmp(inputBuf,"restart")==0)
 		{
-			system("shutdown r");
+            return 27;
 		}
 		else if(strcmp(inputBuf,"reboot")==0)
 		{
-			system("shutdown r");
+            return 27;
 		}
 		else if(strcmp(inputBuf,"pwd")==0)
 		{
@@ -1382,11 +1731,11 @@ loginok:
 		}
 		else if(strcmp(inputBuf,"ver")==0)
 		{
-            printf("AEOS v5.11.2 Build 7049 Kernel patch 1\n");
+            printf("AEOS v5.11.2 Build 7611 Kernel Patch 4\n");
 			printf("root@AEOS51\n");
 			printf("(C)Copyright 2022~2026 Lithium Project LLC\n");
 			printf("By Lithium4141\n");
-			printf("Release date:2026/2/4\n");
+            printf("Release date:2026/2/9\n");
 		}
 		else if(strcmp(inputBuf,"ps")==0)
 		{
@@ -1410,7 +1759,7 @@ loginok:
 			printf("reboot     pwd      ver        ps\n");
 			printf("help       kill     open       bgidm\n");
 			printf("passwd     whoami   lsusr      arm\n");
-            printf("syscfg\n");
+            printf("syscfg     cdufetch\n");
 			printf("Note:To stop a program,press Ctrl-\\\n");
 			printf("     To leave a program in background,try press Ctrl-Z\n");
 		}
@@ -1555,7 +1904,12 @@ loginok:
 					}
 				}
                 fclose(_file);
-                char* __buf;
+				char* __buf;
+				if(strpbrk(inputBuf1, "|&;<>`$\"\'\\/!*?[]{}()~") != NULL) {
+					printf("Invalid syntax!\n");
+                    printf("\n[+1]%s terminated by SIGINOS(Invalid Operation Syntax)",inputBuf);
+					goto agsh;
+				}
 				for(int i=0;i<strlen(inputBuf1);i++)
                 {            
                     inputBuf1[i]-=31;
@@ -1582,27 +1936,110 @@ loginok:
 		{
 			char* others=inputBuf+4;
 			//printf("%s\n",others);
-			if(strncmp(others,"install",7)==0)
+			if(strncmp(others,"install ",8)==0)
 			{
+				char* otherz=others+8;
 				printf("Reading package database... Done\n");
-				printf("[InfDrv:FATAL]:no valid network driver or device found!\n");
-				printf("Error:No valid interface found!\n");
-				printf("Please try again later\n");
-			}
+				printf("Searching package in database... ");
+				char* tmpbuf;
+				if(strpbrk(otherz, "|&;<>`$\"\'\\/!*?[]{}()~") != NULL) {
+					printf("Invalid syntax!\n");
+                    printf("\n%s terminated by SIGINOS(Invalid Operation Syntax)",inputBuf);
+					goto agsh;
+				}
+				sprintf(tmpbuf,"type SYSCFG\\repo.idx|findstr %s",otherz);
+				if(system(tmpbuf)!=0)
+				{
+					printf("Error:Package not found in package database\n");
+					printf("Perhaps updating repository tree?\n");
+					free(tmpbuf);
+					goto agsh;
+				}
+				free(tmpbuf);
+				printf("Downloading package from\"http://lithiumproj.ink/arm-repo/%s\"...\n",otherz);
+				char* urlbuf;
+				char* locbuf;
+				if(strcmp(otherz,"aeos-system-kernel")==0)
+				{
+					sprintf(locbuf,"51kern.exe");
+					system("copy 51kern.exe 51kern.bak");
+					sprintf(urlbuf,"http://lithiumproj.ink/arm-repo/51kern.exe");
+				}
+				else if(strcmp(otherz,"bgidm")==0)
+				{
+					sprintf(locbuf,"bgidm.exe");
+					system("copy bgidm.exe bgidm.bak");
+					sprintf(urlbuf,"http://lithiumproj.ink/arm-repo/bgidm.exe");
+				}
+				else
+				{
+					sprintf(locbuf,"ROOTFS\\%s.rba",otherz);
+					sprintf(urlbuf,"http://lithiumproj.ink/arm-repo/%s.rba",otherz);
+				}
+				int ret=sernet_wtf(SN_PORT,urlbuf,locbuf);
+				free(urlbuf);
+				free(locbuf);
+				if(ret==ERR_DISK_IO)
+				{
+					printf("Error:Disk I/O Error\n");
+					goto agsh;
+				}
+				if(ret==SYS_KILL)
+				{
+					printf("\"%s\" terminated by Ctrl-\\\n",inputBuf);
+					goto agsh;
+				}
+				if(ret==ERR_NET_FAIL)
+				{
+					printf("Error:Network failure\n");
+					goto agsh;
+				}
+				if(ret==ERR_TIMEOUT)
+				{
+					printf("Error:Timeout\n");
+					goto agsh;
+				}
+				char* idxbuf;
+				sprintf(idxbuf,"type SYSCFG\\pkg.idx|findstr %s",otherz);
+				if(system(idxbuf)!=0)
+				{
+                    sprintf(idxbuf,"echo %s >> pkg.idx",otherz);
+                    system(idxbuf);
+                }
+            }
 			else if(strncmp(others,"update-repo",11)==0)
 			{
-				printf("Downloading repository index from\"http://storage.lithiumproj.ink/arm-repo/repo.idx\"...\n");
-				printf("[InfDrv:FATAL]:no valid network driver or device found!\n");
-				printf("Operation failed.\n");
+				printf("Downloading repository index from\"http://lithiumproj.ink/arm-repo/repo.idx\"...\n");
+				int ret=sernet_wtf(SN_PORT,"http://lithiumproj.ink/arm-repo/repo.idx","SYSCFG\\repo.idx");
+				if(ret==ERR_DISK_IO)
+				{
+					printf("Error:Disk I/O Error\n");
+					goto agsh;
+				}
+				if(ret==SYS_KILL)
+				{
+					printf("\"arm update-repo\" terminated by Ctrl-\\\n");
+					goto agsh;
+				}
+				if(ret==ERR_NET_FAIL)
+				{
+					printf("Error:Network failure\n");
+					system("type NUL > SYSCFG\\repo.idx");
+				}
+				if(ret==ERR_TIMEOUT)
+				{
+					printf("Error:Timeout\n");
+					system("type NUL > SYSCFG\\repo.idx");
+				}
 				printf("Building local package databse....\n");
-				system("echo aeos-system-kernel > SYSCFG\\repo.idx");
+				system("echo aeos-system-kernel >> SYSCFG\\repo.idx");
 				system("echo bgidm >> SYSCFG\\repo.idx");
 				system("echo agsh >> SYSCFG\\repo.idx");
 				system("echo infdrv >> SYSCFG\\repo.idx");
 				system("echo opensrv >> SYSCFG\\repo.idx");
 				system("echo bgidm-dos-video-driver >> SYSCFG\\repo.idx");
 				system("echo cutemouse-dos-mouse-driver >> SYSCFG\\repo.idx");
-				system("echo msdos-system-intilazer >> SYSCFG\\repo.idx");
+                system("echo msdos-system-initilazer >> SYSCFG\\repo.idx");
 				printf("Success!\n");
 			}
 			else if(strncmp(others,"update",6)==0)
@@ -1615,6 +2052,12 @@ loginok:
 			{
 				printf("Reading package database... Done\n");
 				char* otherz=others+7;
+				//printf("%s",otherz);
+				if(strpbrk(otherz, "|&;<>`$\"\'\\/!*?[]{}()~") != NULL) {
+					printf("Invalid syntax!\n");
+                    printf("\n[+1]%s terminated by SIGINOS(Invalid Operation Syntax)",inputBuf);
+					goto agsh;
+				}
 				if(strcmp(otherz,"aeos-system-kernel")==0)
 				{
 					 printf("Warning:This is your operating system kernel.Removing it can lead your operating system unable to boot!Confirm operation?[y/n]\n");
@@ -1636,7 +2079,7 @@ loginok:
 						 {
 							 printf("Error:Failed to remove package binaries.\n");
 							 printf("Error code:%d",ret);
-						 }
+                         }
 					 }
 					 else
 					 {
@@ -1649,7 +2092,7 @@ loginok:
                     printf("Warning:This package is not an independent package but a dependency and requirement of \"aeos-system-kernel\".\n");
                     printf("Error:Package not found!\n");
 				}
-                else if(strcmp(otherz,"msdos-system-intilazer")==0)
+                else if(strcmp(otherz,"msdos-system-initilazer")==0)
 				{
 					printf("Warning:This is your operating system kernel.Removing it can lead your operating system unable to boot!Confirm operation?[y/n]\n");
 					int k=getch();
@@ -1680,7 +2123,16 @@ loginok:
                 }
 				else
 				{
-					printf("Error:package not found!\n");
+					char* idxbuf;
+					sprintf(idxbuf,"type SYSCFG\\pkg.idx|findstr %s",otherz);
+					if(system(idxbuf)!=0)
+					{
+                        sprintf(idxbuf,"findstr /V \"%s\" pkg.idx > SYSCFG\\pkg.idx",otherz);
+					}
+					else
+					{
+						printf("Error:package not found!\n");
+					}
 				}
 			}
 			else if(strncmp(others,"clean-cache",11)==0)
@@ -1692,7 +2144,7 @@ loginok:
 			}
 			else if(strncmp(others,"list",4)==0)
 			{
-				system("type SYSCFG\\repo.idx");
+				system("type SYSCFG\\pkg.idx");
 			}
 			else
 			{
@@ -1749,13 +2201,19 @@ loginok:
 						}
 					}
 				}
-				printf("\nMaximum Render FPS:");
+            redo1:
+                printf("\nMaximum Render FPS(Minimum 1):");
 				c=get_uint();
 				if(c==-2)
 				{
 					printf("\"syscfg bgidm\" terminated by Ctrl-\\\n");
 					goto agsh;
 				}
+                if(c==0)
+                {
+                    printf("Error:Invalid configuration\n");
+                    goto redo1;
+                }
 			redo:
 				printf("\nRender tick delay(Minimum 1):");
 				d=get_uint();
@@ -1772,19 +2230,176 @@ loginok:
 				char* buf;
 				sprintf(buf,"echo %d %d %d %d > SYSCFG\\bgidm.cfg",a,b,c,d);
                 system(buf);
+				free(buf);
+                printf("\nOperation done!Reboot to take effects.\n");
 			}
 			else if(strcmp(others,"agetty")==0)
 			{
-				printf("Error:password can only modified by \"passwd\"\n");
+				printf("Note:password can only modified by \"passwd\"\n");
+			}
+			else if(strcmp(others,"agsh")==0)
+			{
+                printf("Select Network serial port:1. COM1   2. COM2   3. COM3  4. COM4\n");
+				int serialmode=1;
+				while(1)
+				{
+					int k=getch();
+					if(k=='1')
+					{
+						serialmode=1;
+						break;
+					}
+					else if(k=='2')
+					{
+						serialmode=2;
+						break;
+					}
+					else if(k=='3')
+					{
+						serialmode=3;
+						break;
+					}
+					else if(k=='4')
+					{
+                        serialmode=4;
+						break;
+					}
+					else if(k==28)
+					{
+						printf("\"syscfg agsh\" terminated by Ctrl-\\\n");
+						goto agsh;
+					}
+				}
+				printf("Select a shell style:\n");
+				printf("1. Default:   root@AEOS51:ROOTFS/ # \n");
+				printf("2. Posh:      \x1B[47mroot\x1B[40m>ROOTFS/> \n");
+                printf("3. Linux SH:  ROOTFS/ # \n");
+                printf("4. DOS:       ROOTFS:\\>\n");
+				printf("5. Kali:      ----(root@AEOS51)-[ROOTFS/]\n");
+                printf("              |--# \n");
+				int shellstyle=1;
+				while(1)
+				{
+					int k=getch();
+					if(k=='1')
+					{
+						shellstyle=1;
+						break;
+					}
+					else if(k=='2')
+					{
+						shellstyle=2;
+						break;
+					}
+					else if(k=='3')
+					{
+						shellstyle=3;
+						break;
+					}
+					else if(k=='4')
+					{
+                        shellstyle=4;
+						break;
+					}
+					else if(k=='5')
+					{
+						shellstyle=5;
+						break;
+					}
+					else if(k==28)
+					{
+						printf("\"syscfg agsh\" terminated by Ctrl-\\\n");
+						goto agsh;
+					}
+				}
+				char* tmp1;
+				sprintf(tmp1,"echo %d %d > SYSCFG\\agsh.cfg",serialmode,shellstyle);
+				system(tmp1);
+				free(tmp1);
+				printf("Operation done!Reboot to take effects.\n");
 			}
 			else
 			{
-				printf("Usage:syscfg [bgidm/agetty]\n");
+				printf("Usage:syscfg [bgidm/agetty/agsh]\n");
 			}
 		}
 		else if(strcmp(inputBuf,"bgidm")==0)
 		{
 			system("bgidm.exe");
+		}
+		else if(strcmp(inputBuf,"cdufetch")==0)
+		{
+			float _m=get_total_mem_mb();
+            float _d=get_total_disk_mb();
+			int _v=get_vram_vga_kb();
+            char* cpuType;
+            if(get_cpu_level()==1)
+            {
+                strcpy(cpuType,"Intel IA-32 i386+");
+            }
+            else
+            {
+                strcpy(cpuType,"Intel 8086 Series");
+            }
+            char* netIf;
+            if(SN_PORT==COM1)
+            {
+                strcpy(netIf,"COM1");
+            }
+            else if(SN_PORT==COM2)
+            {
+                strcpy(netIf,"COM2");
+            }
+            else if(SN_PORT==COM3)
+            {
+                strcpy(netIf,"COM3");
+            }
+            else if(SN_PORT==COM4)
+            {
+                strcpy(netIf,"COM4");
+            }
+            else
+            {
+                strcpy(netIf,"Unknown");
+            }
+            char* themeType;
+            if(AGSH_STYLE==1)
+            {
+                strcpy(themeType,"AGSH");
+            }
+            else if(AGSH_STYLE==2)
+            {
+                strcpy(themeType,"Posh");
+            }
+            else if(AGSH_STYLE==3)
+            {
+                strcpy(themeType,"Linux SH");
+            }
+            else if(AGSH_STYLE==4)
+            {
+                strcpy(themeType,"DOS");
+            }
+            else if(AGSH_STYLE==5)
+            {
+                strcpy(themeType,"Kali");
+            }
+            else
+            {
+                strcpy(netIf,"Unknown");
+            }
+            printf("                                   |  CPU:%s\n",cpuType);
+            printf("    /\\     -----    /---\\   /----- |  RAM:%fMiB\n",_m);
+            printf("   /  \\    .        |   |   |      |  RTFS:%fMiB\n",_d);
+			printf("  /....\\   -----    |   |   \\----\\ |  VRAM:%d.0KiB\n",_v);
+            printf(" /      \\  .        |   |        | |  OS:AEOS v5.11.2\n");
+			printf("/        \\ -----    \\---/   -----/ |  WM&DE:BGIDM\n");
+			printf(" _   _                      _      |  Shell:AGSH v0.9.5\n");
+            printf("|_| |_| |_  _ |_       |_| | |     |  Shell theme:%s\n",themeType);
+			printf("|   | | |_ |_ | |   \\/   |.|_|     |  Kernel:MS-DOS 8.0(4.90.3000)\n");
+            printf("                                   |  Network:SNet eX1000 on %s\n",netIf);
+            free(themeType);
+            free(netIf);
+            free(cpuType);
 		}
 		else
 		{

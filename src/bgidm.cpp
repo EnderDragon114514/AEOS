@@ -793,8 +793,8 @@ int main_dbr() {
 			line(170,240,490,240);
 			settextstyle(TRIPLEX_FONT, HORIZ_DIR, 2);
 			outtextxy(180,210,"[X]About AEOS");
-			outtextxy(180,240,"AEOS v5.11.2 Build 7049");
-			outtextxy(180,270,"AEOS BGIDM v1.10.3 Beta 5 DBR");
+			outtextxy(180,240,"AEOS v5.11.2 Build 7611");
+			outtextxy(180,270,"AEOS BGIDM v1.10.3 Beta 6 DBR");
 			outtextxy(190,300,"By Lithium4141");
 			if(key==27)
 			{
@@ -816,7 +816,7 @@ int main_dbr() {
 		{
 			setcolor(2);
 			settextstyle(TRIPLEX_FONT,HORIZ_DIR,2);
-			outtextxy(10,10,"AEOS v5.11.2 Build 7049");
+			outtextxy(10,10,"AEOS v5.11.2 Build 7611");
 			char* buf;
 			sprintf(buf,"X:%d Y:%d Left key:%s Right key:%s",mouse.x,mouse.y,(mouse.left_button==1?"ON":"OFF"),(mouse.right_button==1?"ON":"OFF"));
 			outtextxy(10,27,buf);
@@ -1374,8 +1374,8 @@ int main_lfr() {
             line(170,240,550,240);
 			settextstyle(TRIPLEX_FONT, HORIZ_DIR, 2);
 			outtextxy(180,210,"[X]About AEOS");
-            outtextxy(180,240,"AEOS v5.11.2 Build 7049 Patch 1");
-			outtextxy(180,270,"AEOS BGIDM v1.10.3 Beta 5 LFR");
+            outtextxy(180,240,"AEOS v5.11.2 Build 7611 Patch 1");
+			outtextxy(180,270,"AEOS BGIDM v1.10.3 Beta 6 LFR");
 			outtextxy(190,300,"By Lithium4141");
 			if(key==27)
 			{
@@ -1396,7 +1396,7 @@ int main_lfr() {
 		{
 			setcolor(2);
 			settextstyle(TRIPLEX_FONT,HORIZ_DIR,2);
-            outtextxy(10,10,"AEOS v5.11.2 Build 7049 Kernel Patch 1");
+            outtextxy(10,10,"AEOS v5.11.2 Build 7611 Kernel Patch 1");
 			char* buf;
 			sprintf(buf,"X:%d Y:%d Left key:%s Right key:%s",mouse.x,mouse.y,(mouse.left_button==1?"ON":"OFF"),(mouse.right_button==1?"ON":"OFF"));
 			outtextxy(10,27,buf);
